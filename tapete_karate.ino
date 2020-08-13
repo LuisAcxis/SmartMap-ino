@@ -5,7 +5,16 @@ int sensores[][3] = { // Array con los puertos del/los sensores
 //{triger, echo, led}
   {2, 3, 4}, // Sensor 1
   {2, 5, 6}, // Sensor 2
-  {2, 7, 8} // Sensor 3
+  {2, 7, 8}, // Sensor 3
+  {2, 9, 10}, // Sensor 4
+  {2, 11, 12}, // Sensor 5
+  {2, 13, 14}, // Sensor 6
+  {2, 15, 16}, // Sensor 7
+  {2, 17, 18}, // Sensor 8
+  {2, 19, 20}, // Sensor 9
+  {2, 21, 22}, // Sensor 10
+  {2, 23, 24}, // Sensor 11
+  {2, 25, 26} // Sensor 12
 };
 int distancia[] = { 
   0, // Distancia minima en cm
@@ -81,7 +90,7 @@ int getRandomSensor() {
   digitalWrite(sensores[sensor][triger], LOW);
 
   long tiempo = pulseIn(sensores[sensor][echo], HIGH);
-  long getDistancia = (tiempo * 0.0343 / 2) - 100; // Calcula la distancia obtenida en centimetros
+  long getDistancia = tiempo * 0.0343 / 2; // Calcula la distancia obtenida en centimetros
   if (getDistancia >= distancia[distanciaMin] && getDistancia <= distancia[distanciaMax]) {
     return false;
   }
