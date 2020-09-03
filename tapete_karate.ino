@@ -1,3 +1,5 @@
+#include <ArduinoJson.h>
+
 int sensores[][3] = { // Array con los puertos del/los sensores
 //{triger, echo, led}
   {23, 22, 2}, // Sensor 1
@@ -8,7 +10,10 @@ int sensores[][3] = { // Array con los puertos del/los sensores
   {33, 32, 7}, // Sensor 6
   {35, 34, 8}, // Sensor 7
   {37, 36, 9}, // Sensor 8
-  {39, 38, 10} // Sensor 9
+  {39, 38, 10}, // Sensor 9
+  {41, 40, 11}, // Sensor 10
+  {43, 42, 12}, // Sensor 11
+  {45, 44, 13} // Sensor 12
 };
 int triger = 0; // Establece la posicion triger como posición en el array
 int echo = 1; // Establece la posicion echo como posición en el array
@@ -31,6 +36,10 @@ int distanciaMax = 1; // Establece la posicion de la distancia maxima como posic
 
 int nivel = -1;
 int sensor_activo = -1;
+int puntos = 0;
+
+StaticJsonDocument<200> jsonSend;
+StaticJsonDocument<200> jsonReceived;
 
 /*---------------------------------------
   setup
@@ -55,18 +64,27 @@ void setup() {
 
 void loop() {
   if(Serial.available()) {
-    String dataReceived = Serial.readString();
-    dataReceived.trim();
-    int dataNivel = dataReceived.toInt();
-    if(dataNivel >= 0 && dataNivel < (sizeof(niveles) / sizeof(int))) {
-      setLevel(dataNivel);
+    String json = Serial.readString();
+    DeserializationError error = deserializeJson(jsonReceived, json);
+    if(error) {
+      sendStatus(4, error.c_str());
+      return;
+    }
+    if(jsonReceived["reset"]) {
+      reset();
+    }
+    if(jsonReceived["nivel"]) {
+      setLevel(jsonReceived["nivel"]);
     }
   }
   
   if(!enableSensor(sensor_activo)) {
     disableSensor(sensor_activo);
     sensor_activo = getSensor();
+    puntos++;
   }
+
+  sendData();
 }
 
 /*---------------------------------------
@@ -134,3 +152,37 @@ int getSensor() {
   disableSensor(sensor_activo);
   sensor_activo = getSensor();
  }
+
+/**
+ * @deprecated Envia la informacion al puerto serial
+ */
+ void sendData() {
+  jsonSend["status"]["code"] = 2;
+  jsonSend["status"]["message"] = "ok";
+  
+  jsonSend["puntos"] = puntos;
+  jsonSend["nivel"] = nivel;
+  serializeJson(jsonSend, Serial);
+  Serial.println();
+  delay(10);
+}
+
+/**
+ * @deprecated Envia el estado de una solicitud
+ * @param  int Especifica el codigo de estado
+ * @param  String Mensaje a mostrar
+ */
+void sendStatus(int code, String message) {
+  jsonSend["status"]["code"] = code;
+  jsonSend["status"]["message"] = message;
+  serializeJson(jsonSend, Serial);
+  Serial.println();
+  delay(10);
+}
+
+/**
+ * @deprecated Reinicia las configuraciones al estado inicial
+ */
+ void reset() {
+  puntos = 0;
+}
