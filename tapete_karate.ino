@@ -1,4 +1,17 @@
+/*---------------------------------------
+  Librerias
+-----------------------------------------*/
+
+// Envia || Recibe datos en formato json
 #include <ArduinoJson.h>
+
+// Gestión de la fecha y hora
+#include <Time.h>
+#include <TimeLib.h>
+
+/*---------------------------------------
+  Variables estaticas
+-----------------------------------------*/
 
 int sensores[][3] = { // Array con los puertos del/los sensores
 //{triger, echo, led}
@@ -34,12 +47,21 @@ int distancia[] = {
 int distanciaMin = 0; // Establece la posicion de la distancia minima como posición en el array
 int distanciaMax = 1; // Establece la posicion de la distancia maxima como posición en el array
 
-int nivel = -1;
-int sensor_activo = -1;
-int puntos = 0;
-
 StaticJsonDocument<200> jsonSend;
 StaticJsonDocument<200> jsonReceived;
+
+/*---------------------------------------
+  Variables dinamicas
+-----------------------------------------*/
+
+int nivel;
+int sensor_activo;
+int puntos;
+
+int
+  horas,
+  minutos,
+  segundos;
 
 /*---------------------------------------
   setup
@@ -53,9 +75,7 @@ void setup() {
     pinMode(sensores[i][echo], INPUT); // Define echo como entrada
     pinMode(sensores[i][led], OUTPUT); // Define led como salida
   }
-  
-  setLevel(3); // Establece el nivel con el cual se iniciara el sketch
-  sensor_activo = getSensor();
+   initialize();
 }
 
 /*---------------------------------------
@@ -67,24 +87,72 @@ void loop() {
     String json = Serial.readString();
     DeserializationError error = deserializeJson(jsonReceived, json);
     if(error) {
-      sendStatus(4, error.c_str());
+      sendData(4, error.c_str());
       return;
     }
-    if(jsonReceived["reset"]) {
-      reset();
-    }
-    if(jsonReceived["nivel"]) {
+    else if(jsonReceived["nivel"]) {
       setLevel(jsonReceived["nivel"]);
     }
-  }
-  
-  if(!enableSensor(sensor_activo)) {
-    disableSensor(sensor_activo);
-    sensor_activo = getSensor();
-    puntos++;
+    else if(jsonReceived["start"]) {
+      start();
+    }
+    else if(jsonReceived["finish"]) {
+      finish();
+    }
+    else if(jsonReceived["reset"]) {
+      reset();
+    }
   }
 
-  sendData();
+  if(sensor_activo != -1) {
+    if(!enableSensor(sensor_activo)) {
+      disableSensor(sensor_activo);
+      sensor_activo = getSensor();
+      puntos++;
+    }
+    calculateElapsedTime();
+    setData();
+  }
+
+  delay(200);
+}
+
+/*---------------------------------------
+    Setup Events Functions
+-----------------------------------------*/
+
+/**
+ * @deprecated Inicia las configuraciones iniciales
+ */
+void initialize() {
+  sensor_activo = -1;
+  puntos = 0;
+  setLevel(3);
+  horas = 0;
+  minutos = 0;
+  segundos = 0;
+}
+
+/**
+ * @deprecated Inicia las variables con las configuraciones dinamicas
+ */
+void start() {
+  setTime(12, 32, 0, 13, 12, 2016); // Establece la fecha y hora a 0
+  sensor_activo = getSensor();
+}
+
+/**
+ * @deprecated Ejecuta el proceso de finalziación
+ */
+void finish() {
+
+}
+
+/**
+ * @deprecated Reinicia las configuraciones al estado inicial
+ */
+ void reset() {
+   initialize();
 }
 
 /*---------------------------------------
@@ -154,35 +222,50 @@ int getSensor() {
  }
 
 /**
- * @deprecated Envia la informacion al puerto serial
+ * @deprecated Calcula el tiempo transcurrido desde el valor de la variable "tiempo_inicio"
  */
- void sendData() {
-  jsonSend["status"]["code"] = 2;
-  jsonSend["status"]["message"] = "ok";
-  
-  jsonSend["puntos"] = puntos;
-  jsonSend["nivel"] = nivel;
-  serializeJson(jsonSend, Serial);
-  Serial.println();
-  delay(10);
+void calculateElapsedTime() {
+  horas = hour();
+  minutos = minute();
+  segundos = second();
+}
+
+/*---------------------------------------
+    json Functions
+-----------------------------------------*/
+
+/**
+ * @deprecated Establece las funciones a llamar para crear el objeto json
+ */
+ void setData() {
+  jsonNivel();
+  jsonPuntos();
+  jsonTiempoTranscurrido();
+  sendData(2, "ok");
 }
 
 /**
- * @deprecated Envia el estado de una solicitud
+ * @deprecated Envia la informacion al puerto serial
  * @param  int Especifica el codigo de estado
  * @param  String Mensaje a mostrar
  */
-void sendStatus(int code, String message) {
+void sendData(int code, String message) {
   jsonSend["status"]["code"] = code;
   jsonSend["status"]["message"] = message;
   serializeJson(jsonSend, Serial);
   Serial.println();
-  delay(10);
 }
 
-/**
- * @deprecated Reinicia las configuraciones al estado inicial
- */
- void reset() {
-  puntos = 0;
+void jsonNivel() {
+  jsonSend["nivel"] = nivel;
+}
+
+void jsonPuntos() {
+  jsonSend["puntos"] = puntos;
+}
+
+void jsonTiempoTranscurrido() {
+  jsonSend["tiempo"]["horas"] = horas;
+  jsonSend["tiempo"]["minutos"] = minutos;
+  jsonSend["tiempo"]["segundos"] = segundos;
 }
