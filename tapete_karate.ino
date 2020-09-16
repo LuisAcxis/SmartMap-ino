@@ -54,9 +54,7 @@ int nivel;
 int sensor_activo;
 int puntos;
 
-unsigned long 
-  tiempo_inicio,
-  tiempo_transcurrido;
+unsigned long tiempo_inicio;
 float
   horas,
   minutos,
@@ -113,8 +111,6 @@ void loop() {
     calculateElapsedTime();
     setData();
   }
-
-  delay(200);
 }
 
 /*---------------------------------------
@@ -222,7 +218,7 @@ int getSensor() {
  * @deprecated Calcula el tiempo transcurrido desde el valor de la variable "tiempo_inicio"
  */
 void calculateElapsedTime() {
-  tiempo_transcurrido = millis() - tiempo_inicio;
+  unsigned long tiempo_transcurrido = millis() - tiempo_inicio;
   horas = int(tiempo_transcurrido / 3600000);
   unsigned long tiempo_terminado = tiempo_transcurrido % 3600000; 
   minutos = int(tiempo_terminado / 60000);
