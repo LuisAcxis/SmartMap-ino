@@ -50,6 +50,8 @@ StaticJsonDocument<200> jsonReceived;
   Variables dinamicas
 -----------------------------------------*/
 
+bool is_started;
+
 int nivel;
 int sensor_activo;
 int puntos;
@@ -102,7 +104,7 @@ void loop() {
     }
   }
 
-  if(sensor_activo != -1) {
+  if(is_started) {
     if(!enableSensor(sensor_activo)) {
       disableSensor(sensor_activo);
       sensor_activo = getSensor();
@@ -121,15 +123,20 @@ void loop() {
  * @deprecated Inicia las configuraciones iniciales
  */
 void initialize() {
+  is_started = false;
   sensor_activo = -1;
   puntos = 0;
-  setLevel(3);
 }
 
 /**
  * @deprecated Inicia las variables con las configuraciones dinamicas
  */
 void start() {
+  if(nivel == 0) {
+    sendData(5, "Selecciona un nivel antes de iniciar.");
+    return false;
+  }
+  is_started = true;
   sensor_activo = getSensor();
   tiempo_inicio = millis();
 }
@@ -138,7 +145,7 @@ void start() {
  * @deprecated Ejecuta el proceso de finalziación
  */
 void finish() {
-
+  is_started = false;
 }
 
 /**
@@ -146,6 +153,7 @@ void finish() {
  */
  void reset() {
    initialize();
+   start();
 }
 
 /*---------------------------------------
