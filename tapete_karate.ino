@@ -5,10 +5,6 @@
 // Envia || Recibe datos en formato json
 #include <ArduinoJson.h>
 
-// Gestión de la fecha y hora
-#include <Time.h>
-#include <TimeLib.h>
-
 /*---------------------------------------
   Variables estaticas
 -----------------------------------------*/
@@ -58,10 +54,14 @@ int nivel;
 int sensor_activo;
 int puntos;
 
-int
+unsigned long 
+  tiempo_inicio,
+  tiempo_transcurrido;
+float
   horas,
   minutos,
-  segundos;
+  segundos,
+  milisegundos;
 
 /*---------------------------------------
   setup
@@ -128,17 +128,14 @@ void initialize() {
   sensor_activo = -1;
   puntos = 0;
   setLevel(3);
-  horas = 0;
-  minutos = 0;
-  segundos = 0;
 }
 
 /**
  * @deprecated Inicia las variables con las configuraciones dinamicas
  */
 void start() {
-  setTime(12, 32, 0, 13, 12, 2016); // Establece la fecha y hora a 0
   sensor_activo = getSensor();
+  tiempo_inicio = millis();
 }
 
 /**
@@ -225,9 +222,13 @@ int getSensor() {
  * @deprecated Calcula el tiempo transcurrido desde el valor de la variable "tiempo_inicio"
  */
 void calculateElapsedTime() {
-  horas = hour();
-  minutos = minute();
-  segundos = second();
+  tiempo_transcurrido = millis() - tiempo_inicio;
+  horas = int(tiempo_transcurrido / 3600000);
+  unsigned long tiempo_terminado = tiempo_transcurrido % 3600000; 
+  minutos = int(tiempo_terminado / 60000);
+  tiempo_terminado = tiempo_terminado % 60000;
+  segundos = int(tiempo_terminado / 1000);
+  milisegundos = tiempo_terminado % 1000; 
 }
 
 /*---------------------------------------
