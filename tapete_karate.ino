@@ -36,15 +36,17 @@ int niveles[] = { // Array con los sensores activos segun el nivel
  12 // Nivel 3 (Sensores activados: 1 - 12)
 };
 
-int distancia[] = {
-  0, // Distancia minima en cm
-  10 // Distancia maxima en cm
-};
-int distanciaMin = 0; // Establece la posicion de la distancia minima como posición en el array
-int distanciaMax = 1; // Establece la posicion de la distancia maxima como posición en el array
+int distanciaMin = 0; // Distancia minima en cm
+int distanciaMax = 10; // Distancia maxima en cm
 
 StaticJsonDocument<200> jsonSend;
 StaticJsonDocument<200> jsonReceived;
+
+// Variables de posición dentro de un array
+
+int horas = 0;
+int minutos = 1;
+int segundos = 2;
 
 /*---------------------------------------
   Variables dinamicas
@@ -56,26 +58,77 @@ int nivel;
 int sensor_activo;
 int puntos;
 
-unsigned long tiempo_inicio;
-float
-  horas,
-  minutos,
-  segundos,
-  milisegundos;
+unsigned long tiempo_lastMillis;
+byte tiempo_limite[3];
+byte tiempo_restante[3];
+
+/*---------------------------------------
+    Setup Events Functions
+-----------------------------------------*/
+
+/**
+ * @deprecated Inicia las configuraciones iniciales
+ */
+void initialize(bool setConfig) {
+  if(setConfig) {
+    Serial.begin(9600);
+    randomSeed(analogRead(A0));
+    for (int i = 0; i < sensores_length; i++) {
+      pinMode(sensores[i][triger], OUTPUT); // Define triger como salida
+      pinMode(sensores[i][echo], INPUT); // Define echo como entrada
+      pinMode(sensores[i][led], OUTPUT); // Define led como salida
+    }
+  }
+  
+  is_started = false;  
+  sensor_activo = -1;
+  puntos = 0;
+}
+
+/**
+ * @deprecated Inicia las variables con las configuraciones dinamicas
+ */
+void start() {
+  if(nivel == 0) {
+    sendData(5, "Selecciona un nivel antes de iniciar.");
+    return false;
+  }
+  
+  if(tiempo_limite[horas] == 0 && tiempo_limite[minutos] == 0 && tiempo_limite[segundos] == 0) {
+    sendData(5, "Selecciona el tiempo limite para iniciar.");
+    return false;
+  } else {
+    tiempo_restante[horas] = tiempo_limite[horas];
+    tiempo_restante[minutos] = tiempo_limite[minutos];
+    tiempo_restante[segundos] = tiempo_limite[segundos];
+  }
+  
+  is_started = true;
+  sensor_activo = getSensor();
+  tiempo_lastMillis = millis();
+}
+
+/**
+ * @deprecated Ejecuta el proceso de finalziación
+ */
+void finish() {
+  is_started = false;
+}
+
+/**
+ * @deprecated Reinicia la aplicación con las configuraciones iniciales
+ */
+ void reset() {
+   initialize(false);
+   start();
+}
 
 /*---------------------------------------
   setup
 -----------------------------------------*/
    
 void setup() {
-  Serial.begin(9600);
-  randomSeed(analogRead(A0));
-  for (int i = 0; i < sensores_length; i++) {
-    pinMode(sensores[i][triger], OUTPUT); // Define triger como salida
-    pinMode(sensores[i][echo], INPUT); // Define echo como entrada
-    pinMode(sensores[i][led], OUTPUT); // Define led como salida
-  }
-   initialize();
+   initialize(true);
 }
 
 /*---------------------------------------
@@ -91,7 +144,15 @@ void loop() {
       return;
     }
     else if(jsonReceived["nivel"]) {
-      setLevel(jsonReceived["nivel"]);
+      setNivel(jsonReceived["nivel"]);
+    }
+    else if(jsonReceived["tiempo"]) {
+      if(jsonReceived["tiempo"]["horas"])
+        tiempo_limite[horas] = jsonReceived["tiempo"]["horas"];
+      if(jsonReceived["tiempo"]["minutos"])
+        tiempo_limite[minutos] = jsonReceived["tiempo"]["minutos"];
+      if(jsonReceived["tiempo"]["segundos"])
+        tiempo_limite[segundos] = jsonReceived["tiempo"]["segundos"];
     }
     else if(jsonReceived["start"]) {
       start();
@@ -110,50 +171,16 @@ void loop() {
       sensor_activo = getSensor();
       puntos++;
     }
-    calculateElapsedTime();
+
+    if(tiempo_restante[horas] == 0 && tiempo_restante[minutos] == 0 && tiempo_restante[segundos] == 0) {
+      sendData(2, "Tiempo agotado.");
+      finish();
+    } else {
+      calculateRemainingTime();
+    }
+    
     setData();
   }
-}
-
-/*---------------------------------------
-    Setup Events Functions
------------------------------------------*/
-
-/**
- * @deprecated Inicia las configuraciones iniciales
- */
-void initialize() {
-  is_started = false;
-  sensor_activo = -1;
-  puntos = 0;
-}
-
-/**
- * @deprecated Inicia las variables con las configuraciones dinamicas
- */
-void start() {
-  if(nivel == 0) {
-    sendData(5, "Selecciona un nivel antes de iniciar.");
-    return false;
-  }
-  is_started = true;
-  sensor_activo = getSensor();
-  tiempo_inicio = millis();
-}
-
-/**
- * @deprecated Ejecuta el proceso de finalziación
- */
-void finish() {
-  is_started = false;
-}
-
-/**
- * @deprecated Reinicia las configuraciones al estado inicial
- */
- void reset() {
-   initialize();
-   start();
 }
 
 /*---------------------------------------
@@ -182,7 +209,7 @@ int getSensor() {
  */
  boolean enableSensor(int sensor) {
   long getDistancia = generatePulse(sensor);
-  if (getDistancia >= distancia[distanciaMin] && getDistancia <= distancia[distanciaMax]) {
+  if (getDistancia >= distanciaMin && getDistancia <= distanciaMax) {
     return false;
   }
   return true;
@@ -216,23 +243,32 @@ int getSensor() {
  * @deprecated Setea el nivel actual
  * @param  int Especifica el nivel
  */
- void setLevel(int level) {
+ void setNivel(int level) {
   nivel = level;
   disableSensor(sensor_activo);
   sensor_activo = getSensor();
  }
 
 /**
- * @deprecated Calcula el tiempo transcurrido desde el valor de la variable "tiempo_inicio"
+ * @deprecated Calcula el tiempo restante
  */
-void calculateElapsedTime() {
-  unsigned long tiempo_transcurrido = millis() - tiempo_inicio;
-  horas = int(tiempo_transcurrido / 3600000);
-  unsigned long tiempo_terminado = tiempo_transcurrido % 3600000; 
-  minutos = int(tiempo_terminado / 60000);
-  tiempo_terminado = tiempo_terminado % 60000;
-  segundos = int(tiempo_terminado / 1000);
-  milisegundos = tiempo_terminado % 1000; 
+void calculateRemainingTime() {
+  int time_elapsed = 1000 - (millis() - tiempo_lastMillis);
+  if(time_elapsed > 0) {
+    delay(time_elapsed);
+  }
+  tiempo_lastMillis = millis();
+  if(tiempo_restante[segundos] > 0 ) {
+    tiempo_restante[segundos]--;
+  }
+  if(tiempo_restante[segundos] == 0 && tiempo_restante[minutos] > 0) {
+    tiempo_restante[minutos]--;
+    tiempo_restante[segundos] = 59;
+  }
+  if(tiempo_restante[minutos] == 0 && tiempo_restante[horas] > 0) {
+    tiempo_restante[horas]--;
+    tiempo_restante[minutos] = 59;
+  }
 }
 
 /*---------------------------------------
@@ -245,8 +281,8 @@ void calculateElapsedTime() {
  void setData() {
   jsonNivel();
   jsonPuntos();
-  jsonTiempoTranscurrido();
-  sendData(2, "ok");
+  jsonTiempoRestante();
+  sendData(2, "");
 }
 
 /**
@@ -269,8 +305,8 @@ void jsonPuntos() {
   jsonSend["puntos"] = puntos;
 }
 
-void jsonTiempoTranscurrido() {
-  jsonSend["tiempo"]["horas"] = horas;
-  jsonSend["tiempo"]["minutos"] = minutos;
-  jsonSend["tiempo"]["segundos"] = segundos;
+void jsonTiempoRestante() {
+  jsonSend["tiempo"]["horas"] = tiempo_restante[horas];
+  jsonSend["tiempo"]["minutos"] = tiempo_restante[minutos];
+  jsonSend["tiempo"]["segundos"] = tiempo_restante[segundos];
 }
